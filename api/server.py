@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 
 from engine.board import Board
 from engine.constants import START_FEN
+from engine.evaluation import evaluate
 from engine.movegen import generate_legal_moves, in_check
 from engine.perft import perft, perft_divide
 from engine.search import SearchEngine, SearchResult
@@ -70,12 +71,21 @@ def _status_from_moves(board: Board, legal_moves: list) -> str:
     return "checkmate" if in_check(board, board.side_to_move) else "stalemate"
 
 
+def _white_eval_from_board(board: Board) -> tuple[int, float]:
+    score_cp_stm = evaluate(board)
+    score_cp_white = score_cp_stm if board.side_to_move == 0 else -score_cp_stm
+    return score_cp_white, round(score_cp_white / 100.0, 2)
+
+
 def _position_payload(board: Board, legal_moves: list) -> dict:
+    position_eval_cp, position_eval = _white_eval_from_board(board)
     return {
         "fen": board.to_fen(),
         "side_to_move": _side_name(board),
         "legal_moves": [move.uci() for move in legal_moves],
         "status": _status_from_moves(board, legal_moves),
+        "position_eval_cp": position_eval_cp,
+        "position_eval": position_eval,
     }
 
 

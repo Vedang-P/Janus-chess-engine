@@ -52,6 +52,7 @@ const EMPTY_SEARCH = {
   depth: 0,
   eval: null,
   eval_cp: null,
+  search_side: "w",
   nodes: 0,
   nps: 0,
   cutoffs: 0,
@@ -137,6 +138,8 @@ export default function App() {
   const [thinking, setThinking] = useState(false);
   const [coldStartHintOpen, setColdStartHintOpen] = useState(false);
   const [showResultOverlay, setShowResultOverlay] = useState(false);
+  const [positionEval, setPositionEval] = useState(null);
+  const [positionEvalCp, setPositionEvalCp] = useState(null);
   const [search, setSearch] = useState(EMPTY_SEARCH);
   const [searchTimeline, setSearchTimeline] = useState([]);
   const [error, setError] = useState("");
@@ -148,7 +151,10 @@ export default function App() {
 
   const board = useMemo(() => parseFenBoard(fen), [fen]);
   const humanTurn = (humanSide === "white" ? "w" : "b") === sideToMove;
-  const evalFill = useMemo(() => clampEvalFill(search.eval_cp), [search.eval_cp]);
+  const evalFill = useMemo(
+    () => clampEvalFill(positionEvalCp ?? search.eval_cp),
+    [positionEvalCp, search.eval_cp]
+  );
   const gameResult = useMemo(() => {
     if (status === "checkmate") {
       return sideToMove === "w"
@@ -168,11 +174,11 @@ export default function App() {
       move,
       eval: Number(evalScore)
     }));
-    if (sideToMove === "w") {
+    if (search.search_side === "w") {
       return entries.sort((a, b) => b.eval - a.eval);
     }
     return entries.sort((a, b) => a.eval - b.eval);
-  }, [search.candidate_moves, sideToMove]);
+  }, [search.candidate_moves, search.search_side]);
 
   const legalTargets = useMemo(() => {
     if (!selectedSquare) return [];
@@ -256,6 +262,8 @@ export default function App() {
     setSideToMove(payload.side_to_move);
     setLegalMoves(payload.legal_moves || []);
     setStatus(payload.status || "ongoing");
+    setPositionEval(typeof payload.position_eval === "number" ? payload.position_eval : null);
+    setPositionEvalCp(typeof payload.position_eval_cp === "number" ? payload.position_eval_cp : null);
     setSelectedSquare(null);
     setDragFromSquare(null);
     setDragToSquare(null);
@@ -289,11 +297,6 @@ export default function App() {
     setSearchTimeline([]);
   }, []);
 
-  const clearSearchView = useCallback(() => {
-    setSearch({ ...EMPTY_SEARCH });
-    setSearchTimeline([]);
-  }, []);
-
   const appendSearchTimelineFrame = useCallback((view) => {
     setSearchTimeline((prev) => {
       const next = [
@@ -319,7 +322,7 @@ export default function App() {
     [applyPosition, recordMoveLocally]
   );
 
-  const buildSearchView = useCallback((payload, whiteSign) => {
+  const buildSearchView = useCallback((payload, whiteSign, rootSide) => {
     const evalCpWhite = (payload.eval_cp ?? 0) * whiteSign;
     const evalWhite = normalizeScore((payload.eval ?? 0) * whiteSign);
     const candidateMovesWhite = Object.fromEntries(
@@ -333,6 +336,7 @@ export default function App() {
       depth: payload.depth || 0,
       eval: evalWhite,
       eval_cp: evalCpWhite,
+      search_side: rootSide,
       nodes: payload.nodes || 0,
       nps: payload.nps || 0,
       cutoffs: payload.cutoffs || 0,
@@ -347,23 +351,21 @@ export default function App() {
   }, []);
 
   const runHttpFallbackSearch = useCallback(
-    async (positionFen, whiteSign, autoPlayBestMove, token) => {
+    async (positionFen, whiteSign, rootSide, autoPlayBestMove, token) => {
       try {
         const payload = autoPlayBestMove
           ? await engineMovePosition(positionFen, maxDepth, timeMs)
           : await analyzePosition(positionFen, maxDepth, timeMs);
         if (token !== searchTokenRef.current) return;
 
+        const view = buildSearchView(payload, whiteSign, rootSide);
+        setSearch(view);
+        appendSearchTimelineFrame(view);
+
         if (autoPlayBestMove && payload.best_move) {
           applyPosition(payload);
           recordMoveLocally(payload.best_move, "engine");
-          clearSearchView();
-          return;
         }
-
-        const view = buildSearchView(payload, whiteSign);
-        setSearch(view);
-        appendSearchTimelineFrame(view);
       } catch (err) {
         if (token !== searchTokenRef.current) return;
         setError(err.message || "Fallback search failed.");
@@ -378,7 +380,6 @@ export default function App() {
       appendSearchTimelineFrame,
       applyPosition,
       buildSearchView,
-      clearSearchView,
       engineMovePosition,
       maxDepth,
       recordMoveLocally,
@@ -416,9 +417,9 @@ export default function App() {
         fallbackStarted = true;
         completed = true;
         clearWatchdog();
-        closeSocket();
-        runHttpFallbackSearch(positionFen, whiteSign, autoPlayBestMove, token);
-      };
+          closeSocket();
+          runHttpFallbackSearch(positionFen, whiteSign, rootSide, autoPlayBestMove, token);
+        };
 
       const armWatchdog = () => {
         clearWatchdog();
@@ -453,7 +454,7 @@ export default function App() {
             return;
           }
           lastSnapshotUiUpdateRef.current = now;
-          const view = buildSearchView(data, whiteSign);
+          const view = buildSearchView(data, whiteSign, rootSide);
           setSearch(view);
           appendSearchTimelineFrame(view);
           return;
@@ -462,18 +463,16 @@ export default function App() {
         if (data.type === "complete") {
           completed = true;
           clearWatchdog();
-          const view = buildSearchView(data, whiteSign);
+          const view = buildSearchView(data, whiteSign, rootSide);
+          setSearch(view);
+          appendSearchTimelineFrame(view);
 
           if (autoPlayBestMove && data.best_move) {
             try {
               await applyMoveToPosition(positionFen, data.best_move, "engine");
-              clearSearchView();
             } catch (err) {
               setError(err.message);
             }
-          } else {
-            setSearch(view);
-            appendSearchTimelineFrame(view);
           }
 
           setThinking(false);
@@ -526,7 +525,6 @@ export default function App() {
       appendSearchTimelineFrame,
       applyMoveToPosition,
       buildSearchView,
-      clearSearchView,
       closeSocket,
       maxDepth,
       runHttpFallbackSearch,
@@ -592,13 +590,12 @@ export default function App() {
       try {
         setError("");
         await applyMoveToPosition(fen, chosenMove, "human");
-        clearSearchView();
       } catch (err) {
         setError(err.message);
       }
       return true;
     },
-    [applyMoveToPosition, clearSearchView, fen, pickMove]
+    [applyMoveToPosition, fen, pickMove]
   );
 
   const handleSquareDown = useCallback(
@@ -768,7 +765,7 @@ export default function App() {
 
           <div className="board-info-row">
             <span>{status === "ongoing" ? `${sideLabel(sideToMove)} to move` : status.toUpperCase()}</span>
-            <span>Eval {formatEval(search.eval)}</span>
+            <span>Eval {formatEval(positionEval ?? search.eval)}</span>
             <span>Depth {search.depth || 0}</span>
             <span>Nodes {search.nodes.toLocaleString()}</span>
             <span>NPS {search.nps.toLocaleString()}</span>
