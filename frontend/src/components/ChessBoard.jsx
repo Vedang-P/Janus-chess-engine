@@ -186,9 +186,9 @@ export default function ChessBoard({
         <marker
           id="arrowHead"
           viewBox="0 0 12 12"
-          markerWidth="3.2"
-          markerHeight="3.2"
-          refX="10.4"
+          markerWidth="4.2"
+          markerHeight="4.2"
+          refX="6"
           refY="6"
           markerUnits="strokeWidth"
           orient="auto"
@@ -387,20 +387,14 @@ export default function ChessBoard({
       {arrows.map((arrow, idx) => {
         const from = squareToDisplayCoords(arrow.from, size, orientation);
         const to = squareToDisplayCoords(arrow.to, size, orientation);
-        const dx = to.x - from.x;
-        const dy = to.y - from.y;
-        const len = Math.hypot(dx, dy) || 1;
-        const headOffset = 12;
-        const x2 = to.x - (dx / len) * headOffset;
-        const y2 = to.y - (dy / len) * headOffset;
 
         return (
           <line
             key={`${arrow.from}-${arrow.to}-${idx}`}
             x1={from.x}
             y1={from.y}
-            x2={x2}
-            y2={y2}
+            x2={to.x}
+            y2={to.y}
             stroke={arrow.color || "#7fa650"}
             strokeWidth={arrow.width || 8}
             strokeLinecap="round"

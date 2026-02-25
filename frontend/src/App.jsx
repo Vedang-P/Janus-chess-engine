@@ -289,6 +289,11 @@ export default function App() {
     setSearchTimeline([]);
   }, []);
 
+  const clearSearchView = useCallback(() => {
+    setSearch({ ...EMPTY_SEARCH });
+    setSearchTimeline([]);
+  }, []);
+
   const appendSearchTimelineFrame = useCallback((view) => {
     setSearchTimeline((prev) => {
       const next = [
@@ -352,6 +357,8 @@ export default function App() {
         if (autoPlayBestMove && payload.best_move) {
           applyPosition(payload);
           recordMoveLocally(payload.best_move, "engine");
+          clearSearchView();
+          return;
         }
 
         const view = buildSearchView(payload, whiteSign);
@@ -371,6 +378,7 @@ export default function App() {
       appendSearchTimelineFrame,
       applyPosition,
       buildSearchView,
+      clearSearchView,
       engineMovePosition,
       maxDepth,
       recordMoveLocally,
@@ -454,14 +462,18 @@ export default function App() {
         if (data.type === "complete") {
           completed = true;
           clearWatchdog();
-          setSearch(buildSearchView(data, whiteSign));
+          const view = buildSearchView(data, whiteSign);
 
           if (autoPlayBestMove && data.best_move) {
             try {
               await applyMoveToPosition(positionFen, data.best_move, "engine");
+              clearSearchView();
             } catch (err) {
               setError(err.message);
             }
+          } else {
+            setSearch(view);
+            appendSearchTimelineFrame(view);
           }
 
           setThinking(false);
@@ -514,6 +526,7 @@ export default function App() {
       appendSearchTimelineFrame,
       applyMoveToPosition,
       buildSearchView,
+      clearSearchView,
       closeSocket,
       maxDepth,
       runHttpFallbackSearch,
@@ -579,12 +592,13 @@ export default function App() {
       try {
         setError("");
         await applyMoveToPosition(fen, chosenMove, "human");
+        clearSearchView();
       } catch (err) {
         setError(err.message);
       }
       return true;
     },
-    [applyMoveToPosition, fen, pickMove]
+    [applyMoveToPosition, clearSearchView, fen, pickMove]
   );
 
   const handleSquareDown = useCallback(
