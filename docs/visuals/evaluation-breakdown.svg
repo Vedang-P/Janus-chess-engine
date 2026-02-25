@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="880" viewBox="0 0 1600 880" role="img" aria-label="Evaluation breakdown diagram">
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="840" viewBox="0 0 1600 840" role="img" aria-label="Evaluation breakdown diagram">
   <defs>
     <style>
       .bg { fill: #161616; }
@@ -15,7 +15,7 @@
     </marker>
   </defs>
 
-  <rect class="bg" x="0" y="0" width="1600" height="880" />
+  <rect class="bg" x="0" y="0" width="1600" height="840" />
   <text class="title" x="70" y="82">Evaluation Breakdown</text>
   <text class="subtitle" x="70" y="116">Centipawn score built from interpretable chess terms</text>
 
@@ -44,15 +44,16 @@
   <text class="t" x="1340" y="255">doubled / isolated</text>
   <text class="mono" x="1340" y="295">passed bonuses</text>
 
-  <path class="edge" d="M205 340 C205 470, 580 470, 580 580" />
-  <path class="edge" d="M515 340 C515 470, 640 470, 640 580" />
-  <path class="edge" d="M825 340 C825 470, 700 470, 700 580" />
-  <path class="edge" d="M1135 340 C1135 470, 760 470, 760 580" />
-  <path class="edge" d="M1420 340 C1420 470, 820 470, 820 580" />
+  <path class="edge" d="M205 340 C205 455, 575 455, 575 535" />
+  <path class="edge" d="M515 340 C515 455, 645 455, 645 535" />
+  <path class="edge" d="M825 340 C825 455, 715 455, 715 535" />
+  <path class="edge" d="M1135 340 C1135 455, 785 455, 785 535" />
+  <path class="edge" d="M1420 340 C1420 455, 855 455, 855 535" />
 
-  <rect class="panel" x="460" y="560" width="680" height="230" />
-  <text class="h" x="500" y="620">Final Score Assembly</text>
-  <text class="mono" x="500" y="670">white_total - black_total = white_minus_black</text>
-  <text class="mono" x="500" y="710">score_cp = (side_to_move == white) ? +x : -x</text>
-  <text class="t" x="500" y="750">Detailed maps emitted: piece_values, piece_breakdown, heatmap</text>
+  <rect class="panel" x="420" y="535" width="760" height="235" />
+  <text class="h" x="460" y="595">Final Score Assembly</text>
+  <text class="mono" x="460" y="645">white_total - black_total = white_minus_black</text>
+  <text class="mono" x="460" y="685">score_cp = (side_to_move == white) ? +x : -x</text>
+  <text class="t" x="460" y="725">Detailed maps emitted:</text>
+  <text class="t" x="460" y="752">piece_values, piece_breakdown, heatmap</text>
 </svg>
