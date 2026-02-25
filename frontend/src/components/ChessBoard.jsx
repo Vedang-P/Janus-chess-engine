@@ -1,4 +1,6 @@
-import { FILES, indexToSquare, parseFenBoard } from "../lib/chess";
+import { useEffect, useState } from "react";
+
+import { FILES, indexToSquare, parseFenBoard, squareToIndex } from "../lib/chess";
 
 function displaySquareToBoardIndex(displayIndex, orientation) {
   const row = Math.floor(displayIndex / 8);
@@ -29,8 +31,55 @@ function squareToDisplayCoords(square, size, orientation) {
   };
 }
 
+function pointerEventToSquare(event, size, orientation) {
+  const svg = event.currentTarget;
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  const localX = ((event.clientX - rect.left) * size) / rect.width;
+  const localY = ((event.clientY - rect.top) * size) / rect.height;
+  if (localX < 0 || localY < 0 || localX >= size || localY >= size) return null;
+
+  const col = Math.floor(localX / (size / 8));
+  const row = Math.floor(localY / (size / 8));
+  const displayIndex = row * 8 + col;
+  const boardIndex = displaySquareToBoardIndex(displayIndex, orientation);
+  return indexToSquare(boardIndex);
+}
+
+function pointerEventToCoords(event, size) {
+  const svg = event.currentTarget;
+  const rect = svg.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return null;
+
+  const localX = ((event.clientX - rect.left) * size) / rect.width;
+  const localY = ((event.clientY - rect.top) * size) / rect.height;
+  const x = Math.max(0, Math.min(size, localX));
+  const y = Math.max(0, Math.min(size, localY));
+  return { x, y };
+}
+
 function heatOpacity(value) {
-  return Math.min(0.26, 0.05 + Math.abs(value) * 0.03);
+  return Math.min(0.7, 0.2 + Math.abs(value) * 0.07);
+}
+
+function heatColor(value) {
+  const magnitude = Math.min(8, Math.abs(value));
+  const t = magnitude / 8;
+
+  if (value >= 0) {
+    // Warm bright reds for increasing attacking pressure.
+    const hue = Math.round(14 - t * 8);
+    const sat = Math.round(76 + t * 18);
+    const light = Math.round(44 + t * 16);
+    return `hsl(${hue} ${sat}% ${light}%)`;
+  }
+
+  // Darker crimson shades for opposite pressure.
+  const hue = Math.round(358 - t * 2);
+  const sat = Math.round(62 + t * 18);
+  const light = Math.round(22 + t * 14);
+  return `hsl(${hue} ${sat}% ${light}%)`;
 }
 
 function pieceAssetName(piece) {
@@ -42,25 +91,89 @@ export default function ChessBoard({
   fen,
   orientation = "white",
   selectedSquare = null,
+  trackedSquare = null,
   legalTargets = [],
   lastMove = null,
   currentMove = "",
   hoveredSquare = null,
+  dragFromSquare = null,
+  dragToSquare = null,
   heatmap = {},
   arrows = [],
-  onSquareClick,
-  onSquareHover
+  onSquareHover,
+  onSquareDown,
+  onSquareUp,
+  onSquareEnter,
+  onSquareTap
 }) {
   const board = parseFenBoard(fen);
   const size = 640;
   const cell = size / 8;
   const legalTargetsSet = new Set(legalTargets);
+  const [dragPointer, setDragPointer] = useState(null);
 
   const currentFrom = currentMove?.slice(0, 2) || null;
   const currentTo = currentMove?.slice(2, 4) || null;
+  const draggedPiece = dragFromSquare ? board[squareToIndex(dragFromSquare)] : null;
+
+  useEffect(() => {
+    if (!dragFromSquare) {
+      setDragPointer(null);
+    }
+  }, [dragFromSquare]);
+
+  const handleBoardPointerMove = (event) => {
+    if (dragFromSquare) {
+      const coords = pointerEventToCoords(event, size);
+      if (coords) {
+        setDragPointer(coords);
+      }
+    }
+
+    const square = pointerEventToSquare(event, size, orientation);
+    if (!square) {
+      onSquareHover?.(null);
+      return;
+    }
+    onSquareHover?.(square);
+    onSquareEnter?.(square);
+  };
+
+  const handleBoardPointerUp = (event) => {
+    const coords = pointerEventToCoords(event, size);
+    if (coords) {
+      setDragPointer(coords);
+    }
+
+    const square = pointerEventToSquare(event, size, orientation);
+    if (square) {
+      if (!dragFromSquare || dragFromSquare === square) {
+        onSquareTap?.(square);
+      }
+      onSquareUp?.(square);
+    } else if (dragFromSquare) {
+      onSquareUp?.(dragFromSquare);
+    }
+
+    if (event.currentTarget.releasePointerCapture) {
+      try {
+        event.currentTarget.releasePointerCapture(event.pointerId);
+      } catch {
+        // Ignore pointer capture release errors.
+      }
+    }
+  };
 
   return (
-    <svg className="board" viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Chess board">
+    <svg
+      className="board"
+      viewBox={`0 0 ${size} ${size}`}
+      role="img"
+      aria-label="Chess board"
+      onPointerMove={handleBoardPointerMove}
+      onPointerUp={handleBoardPointerUp}
+      onPointerLeave={() => onSquareHover?.(null)}
+    >
       <defs>
         <linearGradient id="lightSquare" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stopColor="#f0d9b5" />
@@ -89,15 +202,25 @@ export default function ChessBoard({
         const isLastMove = lastMove && (lastMove.from === square || lastMove.to === square);
         const isCurrentMove = square === currentFrom || square === currentTo;
         const isHovered = hoveredSquare === square;
+        const isTracked = trackedSquare === square;
+        const isDragFrom = dragFromSquare === square;
+        const isDragTo = dragToSquare === square;
         const heat = heatmap[square] || 0;
-        const heatPositive = heat > 0;
 
         return (
           <g
             key={square}
-            onClick={() => onSquareClick?.(square)}
-            onMouseEnter={() => onSquareHover?.(square)}
-            onMouseLeave={() => onSquareHover?.(null)}
+            onPointerDown={(event) => {
+              const svg = event.currentTarget.ownerSVGElement;
+              if (svg?.setPointerCapture) {
+                svg.setPointerCapture(event.pointerId);
+              }
+              onSquareDown?.(square, event);
+            }}
+            onPointerEnter={() => {
+              onSquareHover?.(square);
+              onSquareEnter?.(square);
+            }}
             style={{ cursor: "pointer" }}
           >
             <rect x={x} y={y} width={cell} height={cell} fill={isLight ? "url(#lightSquare)" : "url(#darkSquare)"} />
@@ -108,7 +231,7 @@ export default function ChessBoard({
                 y={y + 1.5}
                 width={cell - 3}
                 height={cell - 3}
-                fill={heatPositive ? "#7fa650" : "#8f8a84"}
+                fill={heatColor(heat)}
                 opacity={heatOpacity(heat)}
               />
             )}
@@ -120,9 +243,9 @@ export default function ChessBoard({
                 width={cell - 4}
                 height={cell - 4}
                 fill="none"
-                stroke="#cdd26a"
-                strokeWidth="3.5"
-                opacity="0.92"
+                stroke="#d3cf72"
+                strokeWidth="3"
+                opacity="0.9"
               />
             )}
 
@@ -134,7 +257,7 @@ export default function ChessBoard({
                 height={cell - 10}
                 fill="none"
                 stroke="#6f9d4f"
-                strokeWidth="4"
+                strokeWidth="3"
                 opacity="0.95"
               />
             )}
@@ -147,24 +270,63 @@ export default function ChessBoard({
                 height={cell - 8}
                 fill="none"
                 stroke="#7fa650"
-                strokeWidth="4"
+                strokeWidth="3"
               />
             )}
 
-            {isTarget && (
-              <circle cx={x + cell / 2} cy={y + cell / 2} r={cell * 0.14} fill="#6f9d4f" opacity="0.9" />
+            {isTracked && (
+              <rect
+                x={x + 3}
+                y={y + 3}
+                width={cell - 6}
+                height={cell - 6}
+                fill="none"
+                stroke="#c6a25a"
+                strokeWidth="3.2"
+                opacity="0.95"
+              />
             )}
 
-            {isHovered && (
+            {isDragFrom && (
+              <rect
+                x={x + 6}
+                y={y + 6}
+                width={cell - 12}
+                height={cell - 12}
+                fill="none"
+                stroke="#4f7234"
+                strokeWidth="3"
+                opacity="0.85"
+              />
+            )}
+
+            {isDragTo && (
               <rect
                 x={x + 8}
                 y={y + 8}
                 width={cell - 16}
                 height={cell - 16}
                 fill="none"
-                stroke="#6b6760"
+                stroke="#9bc26a"
+                strokeWidth="3"
+                opacity="0.9"
+              />
+            )}
+
+            {isTarget && (
+              <circle cx={x + cell / 2} cy={y + cell / 2} r={cell * 0.14} fill="#6f9d4f" opacity="0.88" />
+            )}
+
+            {isHovered && (
+              <rect
+                x={x + 10}
+                y={y + 10}
+                width={cell - 20}
+                height={cell - 20}
+                fill="none"
+                stroke="#66635d"
                 strokeWidth="2"
-                opacity="0.72"
+                opacity="0.7"
               />
             )}
           </g>
@@ -185,13 +347,18 @@ export default function ChessBoard({
             strokeWidth={arrow.width || 8}
             strokeLinecap="round"
             markerEnd="url(#arrowHead)"
-            opacity={arrow.opacity || 0.84}
+            opacity={arrow.opacity || 0.82}
           />
         );
       })}
 
       {Array.from({ length: 64 }).map((_, displayIndex) => {
         const boardIndex = displaySquareToBoardIndex(displayIndex, orientation);
+        const square = indexToSquare(boardIndex);
+        if (dragFromSquare && square === dragFromSquare && draggedPiece) {
+          return null;
+        }
+
         const piece = board[boardIndex];
         if (!piece) return null;
 
@@ -212,6 +379,20 @@ export default function ChessBoard({
           />
         );
       })}
+
+      {draggedPiece && dragPointer && (
+        <g className="drag-piece" transform={`translate(${dragPointer.x} ${dragPointer.y})`}>
+          <image
+            x={-(cell - 6) / 2}
+            y={-(cell - 6) / 2}
+            width={cell - 6}
+            height={cell - 6}
+            href={`/pieces/cburnett/${pieceAssetName(draggedPiece)}.svg`}
+            preserveAspectRatio="xMidYMid meet"
+            pointerEvents="none"
+          />
+        </g>
+      )}
 
       {(orientation === "white" ? FILES : FILES.split("").reverse().join("")).split("").map((file, idx) => (
         <text key={`file-${file}`} x={idx * cell + 8} y={size - 8} className="coord">

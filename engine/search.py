@@ -119,7 +119,7 @@ class SearchEngine:
                 candidate_moves=candidate_moves,
                 piece_values=root_eval.piece_values,
                 piece_breakdown=root_eval.piece_breakdown,
-                heatmap=_build_heatmap(candidate_moves, pv_uci),
+                heatmap=_compose_heatmap(root_eval.heatmap, candidate_moves, pv_uci),
             )
             if on_iteration is not None:
                 on_iteration(best_result)
@@ -192,7 +192,7 @@ class SearchEngine:
                     candidate_moves=candidate_moves,
                     piece_values=root_eval.piece_values,
                     piece_breakdown=root_eval.piece_breakdown,
-                    heatmap=_build_heatmap(candidate_moves, pv_uci),
+                    heatmap=_compose_heatmap(root_eval.heatmap, candidate_moves, pv_uci),
                     cutoffs=self.cutoffs,
                     elapsed_ms=round(elapsed_ms, 2),
                 )
@@ -276,6 +276,18 @@ def _build_heatmap(candidate_moves: dict[str, float], pv: list[str]) -> dict[str
         heatmap[to_sq] = heatmap.get(to_sq, 0) + max(1, 4 - idx)
 
     return heatmap
+
+
+def _compose_heatmap(
+    static_heatmap: dict[str, int],
+    candidate_moves: dict[str, float],
+    pv: list[str],
+) -> dict[str, int]:
+    merged = dict(static_heatmap)
+    search_heatmap = _build_heatmap(candidate_moves, pv)
+    for square, value in search_heatmap.items():
+        merged[square] = merged.get(square, 0) + value
+    return merged
 
 
 def _move_order_key(move: Move) -> int:

@@ -1,116 +1,130 @@
-# Chess Engine + Live Visualization Platform
+# JANUS: Chess Engine + Live Analysis Platform
 
-Performance-oriented classical chess engine + real-time web visualization.
+<p align="center">
+  <img src="frontend/public/janus-logo.jpg" alt="JANUS logo" width="180" />
+</p>
 
-## Live Project Scope
-- Bitboard board model with reversible make/unmake
-- Pseudo-legal + legal move generation
-- Perft validation suite (non-negotiable correctness gate)
-- Iterative deepening negamax alpha-beta search with time control
-- Handcrafted centipawn evaluation (material, PST, mobility, king safety, pawn structure)
-- Throttled search instrumentation snapshots over WebSocket
-- React + SVG interactive board with live engine telemetry panels
+**JANUS** is a performance-oriented classical chess engine with a real-time web visualization interface.
 
-## Architecture
-```mermaid
-flowchart LR
-  UI[React + SVG Frontend] -->|POST /move /reset /analyze| API[FastAPI Backend]
-  UI -->|WS /ws/search| WS[WebSocket Stream]
-  API --> BOARD[Board + Bitboards]
-  API --> SEARCH[Iterative Deepening Alpha-Beta]
-  SEARCH --> EVAL[Handcrafted Evaluation]
-  SEARCH --> MOVEGEN[Legal Move Generator]
-  MOVEGEN --> BOARD
-  SEARCH --> INSTR[SnapshotThrottle + SearchSnapshot]
-  INSTR --> WS
+It combines:
+- **Correct engine fundamentals** (bitboards, legal move generation, perft-tested correctness)
+- **Search + evaluation transparency** (live PV, candidate moves, eval trends, piece breakdowns)
+- **Production-style architecture** (FastAPI + WebSockets backend, React/SVG frontend)
+
+This project is designed to be understandable for newcomers while still technically rigorous for engineers.
+
+## What This Project Does
+At a high level, JANUS lets you:
+1. Play moves on an interactive board.
+2. Run live engine analysis in real time.
+3. See *why* the engine prefers a move through visual telemetry and dynamic piece valuation.
+
+Unlike opaque chess bots, JANUS exposes internal search behavior as the engine thinks.
+
+## Core Capabilities
+- 64-bit bitboard board representation
+- Full legal move generation with make/unmake
+- Perft correctness testing against known reference values
+- Iterative deepening negamax + alpha-beta pruning
+- Time-controlled search
+- Handcrafted centipawn evaluation:
+  - material
+  - piece-square tables
+  - mobility
+  - king safety
+  - pawn structure
+- Live instrumentation stream over WebSocket
+- Interactive React + SVG analysis UI with:
+  - search flow graph
+  - principal variation
+  - candidate move rankings
+  - dynamic piece value inspection
+  - board heatmaps
+
+## Workflow Visualization
+
+### Search / Telemetry Flow
+![Search Flow](docs/images/search-flow.svg)
+
+### UI Overview
+![UI Overview](docs/images/ui-overview.svg)
+
+## Tech Stack
+- **Backend:** Python 3.11+, FastAPI, Uvicorn
+- **Frontend:** React (Vite), SVG rendering
+- **Engine:** Custom implementation (no heavy engine libraries)
+- **Transport:** REST + WebSockets
+- **Deployment:** Render (backend) + Cloudflare Pages (frontend)
+
+## Repository Structure
+```text
+chess_engine/
+├── api/                  # FastAPI server + websocket routes
+├── engine/               # Core chess engine modules
+├── frontend/             # React app (Vite)
+├── tests/                # Perft + movegen + integration tests
+├── docs/images/          # Visual assets for docs
+├── Dockerfile            # Backend container
+├── render.yaml           # Render service config
+└── README.md
 ```
 
-## Engine Design
-### Phase 1: Board + Bitboards
-- 12 piece bitboards + white/black/all occupancy bitboards
-- Full board state: side-to-move, castling rights, en passant, clocks
-- Reversible `make_move`/`unmake_move` with state history
+## Local Setup
+### Prerequisites
+- Python **3.11+**
+- Node.js **18+** (or newer)
+- npm
 
-### Phase 2: Move Generation (Critical)
-- Pseudo-legal move generation for pawns/knights/kings/sliders
-- Sliding pieces use **precomputed rays for all 64 squares**
-- Legal filtering: pseudo move -> make -> king safety check -> discard illegal -> unmake
-
-### Phase 3: Perft (Correctness Gate)
-- `perft(position, depth)` and `perft_divide`
-- Fails fast in tests if known perft values mismatch
-
-### Phase 4: Search
-- Negamax alpha-beta with node counting and cutoff counting
-- Iterative deepening (best move per completed depth)
-- Hard time limit with safe timeout abort
-
-### Phase 5: Evaluation (Centipawns)
-Evaluation includes all required components:
-- Material balance
-- Piece-square tables
-- Mobility bonus
-- Basic king safety
-- Pawn structure:
-  - Doubled pawns
-  - Isolated pawns
-  - Passed pawns
-
-Also exposes explainability data:
-- Per-piece contribution breakdown (base/pst/mobility/pawn_structure/king_safety/total)
-- Piece value map for UI overlays
-- Board pressure heatmap
-
-### Phase 6: Instrumentation
-Search emits throttled snapshots (`~80ms` default):
-```json
-{
-  "depth": 6,
-  "nodes": 153294,
-  "nps": 412000,
-  "current_move": "e2e4",
-  "pv": ["e2e4", "e7e5", "g1f3"],
-  "eval": 0.42,
-  "eval_cp": 42,
-  "candidate_moves": {"e2e4": 0.42, "d2d4": 0.31},
-  "piece_values": {"g1": 312, "f5": -372},
-  "piece_breakdown": {"g1": {"base": 320, "pst": -8, "mobility": 0, "total": 312}},
-  "heatmap": {"e4": 3, "d5": 2},
-  "cutoffs": 941,
-  "elapsed_ms": 823.5
-}
+### 1) Clone and install backend
+```bash
+cd /path/to/your/workspace
+git clone https://github.com/<your-username>/<your-repo>.git
+cd <your-repo>
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 ```
 
-## API
-### HTTP
-- `GET /health`
-- `POST /analyze` -> evaluate/search current position
-- `POST /move` -> play a move (`fen`, `move`)
-- `POST /reset` -> reset to start FEN (or supplied FEN)
-- `POST /legal-moves` -> legal moves for a FEN
-- `POST /perft` -> perft/perft-divide
+### 2) Install frontend
+```bash
+cd frontend
+npm install
+cd ..
+```
 
-### WebSocket
-- `WS /ws/search`
-- Streams throttled `snapshot` events and one `complete` event
+## Run Locally
+Open two terminals.
 
-## Frontend UI
-- Left panel: interactive SVG board
-  - Click-to-move
-  - Live PV/candidate arrows
-  - Current searched move highlight
-  - Heatmap overlays
-- Right panel: engine instrumentation
-  - Depth / Nodes / NPS / Eval bar
-  - PV panel
-  - Candidate move ranking (live reorder)
-  - Dynamic piece valuation inspector (hover square)
-  - Search progression mini-timeline + cutoff counters
+### Terminal A: backend
+```bash
+cd /path/to/<your-repo>
+source .venv/bin/activate
+python3 -m uvicorn api.server:app --host 127.0.0.1 --port 8000 --reload
+```
 
-Piece assets:
-- Uses Lichess `cburnett` SVG pieces in [frontend/public/pieces/cburnett](/Users/vedang/Desktop/Projects/Chess_engine/frontend/public/pieces/cburnett)
+### Terminal B: frontend
+```bash
+cd /path/to/<your-repo>/frontend
+cp .env.example .env
+npm run dev
+```
 
-## Perft Correctness Proof
+Open the frontend URL shown by Vite (usually `http://127.0.0.1:5173`).
+
+## How to Use (Quick)
+1. Start a new game from the right panel.
+2. Move pieces by drag-and-drop or click-to-move.
+3. Click **Analyze** to run engine evaluation for the current position.
+4. Use **Heatmap On/Off** to toggle board heat overlays.
+5. Click any piece to lock its **Dynamic Value** panel.
+   - Click another piece to switch tracking.
+   - Click the same tracked piece again to deselect.
+
+## Correctness and Testing
+Engine correctness is validated with perft tests.
+
+Known results:
+
 | Position | Depth | Expected | Actual |
 |---|---:|---:|---:|
 | Start position | 1 | 20 | 20 |
@@ -120,15 +134,13 @@ Piece assets:
 | Kiwipete | 2 | 2039 | 2039 |
 | Kiwipete | 3 | 97862 | 97862 |
 
-Run validation:
+Run all tests:
 ```bash
 python3 -m pytest -q
 ```
 
-Current status: `24 passed`.
-
-## Performance Metrics (Local)
-Measured on this implementation:
+## Performance Snapshot (Local)
+Example measurements on this implementation:
 - Search benchmark (start position, `max_depth=5`, `time_limit_ms=4000`)
   - completed depth: `3`
   - nodes: `3084`
@@ -139,44 +151,55 @@ Measured on this implementation:
   - elapsed: `2555 ms`
   - nps: `77213`
 
-## Screenshots / Visual Assets
-- UI overview: ![UI Overview](/Users/vedang/Desktop/Projects/Chess_engine/docs/images/ui-overview.svg)
-- Search flow: ![Search Flow](/Users/vedang/Desktop/Projects/Chess_engine/docs/images/search-flow.svg)
+## Deployment (Beginner-Friendly, Free)
+Recommended stack:
+- **Backend:** Render Free Web Service
+- **Frontend:** Cloudflare Pages
 
-## Local Run
-### Backend
-```bash
-cd /Users/vedang/Desktop/Projects/Chess_engine
-python3 -m pip install -r requirements.txt
-python3 -m uvicorn api.server:app --reload
-```
+### A) Deploy backend on Render
+This repo already includes:
+- `Dockerfile`
+- `render.yaml`
 
-### Frontend
-```bash
-cd /Users/vedang/Desktop/Projects/Chess_engine/frontend
-npm install
-npm run dev
-```
+Steps:
+1. Push this repo to GitHub.
+2. In Render: **New -> Web Service -> Connect repo**.
+3. Render should detect Docker automatically.
+4. Use Free plan.
+5. After deploy, verify:
+   - `https://<your-backend>.onrender.com/health`
+   - should return `{"status":"ok"}`
 
-Open `http://localhost:5173`.
+### B) Deploy frontend on Cloudflare Pages
+1. In Cloudflare: **Workers & Pages -> Create -> Pages -> Connect to Git**.
+2. Select this repo.
+3. Set build config:
+   - Root directory: `frontend`
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+4. Add environment variable:
+   - `VITE_API_BASE=https://<your-backend>.onrender.com`
+5. Deploy.
 
-## Deployment
-### Backend (Fly.io / Render / Railway)
-- Service start command: `python3 -m uvicorn api.server:app --host 0.0.0.0 --port $PORT`
-- Set env var: `PYTHONUNBUFFERED=1`
+### C) Final shareable URL
+Use your Cloudflare Pages domain (or custom domain) as the public project URL.
 
-### Frontend (Cloudflare Pages)
-- Build command: `npm run build`
-- Output directory: `dist`
-- Env var: `VITE_API_BASE=https://<your-backend-domain>`
-
-### Shareable URL
-- Final single URL requires your deployment account credentials (Fly/Render/Railway + Cloudflare).
-- Once deployed, use Cloudflare custom domain (or Pages domain) as the single shareable URL.
+## Troubleshooting
+- Frontend loads but moves/analyze fail:
+  - Check `VITE_API_BASE` points to deployed backend URL.
+- First analysis call is slow on free tier:
+  - Render free service may be waking from idle sleep.
+- WebSocket issues in production:
+  - Confirm backend is HTTPS and frontend uses that HTTPS API base.
 
 ## Known Limitations
-- No transposition table / Zobrist hash yet
+- No transposition table / Zobrist hashing yet
 - No quiescence search yet
-- No opening book / endgame tablebases
-- UI uses click-to-move; drag-and-drop promotion chooser is pending
-- Search strength is correctness-first; performance optimization is still ongoing
+- No opening book or tablebases in engine loop
+- Search strength is correctness-first; further performance tuning is possible
+
+## Why This Project Is Resume-Ready
+- Demonstrates algorithmic depth (movegen/search/eval)
+- Shows correctness discipline (perft gate + tests)
+- Includes real-time observability and explainability
+- Ships as a full-stack deployable product

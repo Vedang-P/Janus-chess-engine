@@ -359,8 +359,7 @@ def _evaluate(board: Board, collect_details: bool) -> tuple[int, dict | None]:
 
             if collect_details:
                 signed_total = total if side == WHITE else -total
-                stm_sign = 1 if board.side_to_move == WHITE else -1
-                piece_values[sq_key] = signed_total * stm_sign
+                piece_values[sq_key] = signed_total
                 piece_breakdown[sq_key] = {
                     "piece": PIECE_SYMBOLS[piece],
                     "side": "w" if side == WHITE else "b",
