@@ -31,7 +31,4 @@ python3 scripts/plot_metrics.py
 python3 scripts/generate_demo_gifs.py
 ```
 
-## Editing workflow (professional tools)
-- Use Mermaid in README for fast text-based diagrams.
-- Use Figma or diagrams.net to iterate visual composition, then export SVG.
-- Keep line weights and spacing consistent across all assets.
+
