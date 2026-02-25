@@ -1002,6 +1002,21 @@ export default function App() {
           ))}
         </div>
       </section>
+
+      <footer className="credit-line">
+        <span>made by Vedang.</span>
+        <a
+          href="https://github.com/Vedang-P"
+          target="_blank"
+          rel="noreferrer noopener"
+          aria-label="Vedang GitHub profile"
+          className="credit-github"
+        >
+          <svg viewBox="0 0 24 24" role="img" aria-hidden="true">
+            <path d="M12 .5a12 12 0 0 0-3.79 23.39c.6.12.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61a3.18 3.18 0 0 0-1.34-1.76c-1.1-.75.08-.74.08-.74a2.52 2.52 0 0 1 1.84 1.24 2.56 2.56 0 0 0 3.5 1 2.56 2.56 0 0 1 .76-1.61c-2.67-.3-5.47-1.34-5.47-5.94a4.65 4.65 0 0 1 1.24-3.23 4.32 4.32 0 0 1 .12-3.19s1.01-.32 3.3 1.23a11.36 11.36 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23a4.32 4.32 0 0 1 .12 3.19 4.64 4.64 0 0 1 1.23 3.23c0 4.61-2.8 5.64-5.48 5.93a2.86 2.86 0 0 1 .82 2.22v3.29c0 .32.22.7.83.58A12 12 0 0 0 12 .5Z" />
+          </svg>
+        </a>
+      </footer>
     </div>
   );
 }

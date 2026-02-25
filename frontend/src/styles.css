@@ -708,6 +708,40 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.credit-line {
+  margin-top: 10px;
+  padding: 8px 0 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-soft);
+  font-size: 0.88rem;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  font-family: var(--font-heading);
+}
+
+.credit-github {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: var(--text-main);
+  text-decoration: none;
+}
+
+.credit-github svg {
+  width: 18px;
+  height: 18px;
+  fill: currentcolor;
+}
+
+.credit-github:hover {
+  color: var(--accent-gold);
+}
+
 @media (max-width: 980px) {
   .layout {
     grid-template-columns: 1fr;
