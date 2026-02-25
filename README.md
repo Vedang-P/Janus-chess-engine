@@ -13,7 +13,7 @@
 </p>
 
 ## What JANUS Shows
-JANUS is designed to make engine decisions understandable, not opaque.
+JANUS is designed to make engine decisions understandable.
 
 - Legal move generation built on reversible make/unmake state transitions
 - Perft-verified correctness on known reference positions
