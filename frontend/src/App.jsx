@@ -338,7 +338,7 @@ export default function App() {
     osc.frequency.exponentialRampToValueAtTime(520, now + 0.045);
 
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.18, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.36, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
     osc.connect(gain);
