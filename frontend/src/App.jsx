@@ -150,6 +150,31 @@ function createAudioContext() {
   }
 }
 
+function isCaptureMoveFromFen(fen, move) {
+  if (!fen || !move || move.length < 4) return false;
+  const board = parseFenBoard(fen);
+  const from = move.slice(0, 2);
+  const to = move.slice(2, 4);
+  const fromIdx = squareToIndex(from);
+  const toIdx = squareToIndex(to);
+  const movingPiece = board[fromIdx];
+  const targetPiece = board[toIdx];
+
+  if (!movingPiece) return false;
+  if (targetPiece && pieceColor(targetPiece) !== pieceColor(movingPiece)) return true;
+
+  const isPawn = movingPiece.toLowerCase() === "p";
+  if (!isPawn) return false;
+  const isDiagonal = from.charCodeAt(0) !== to.charCodeAt(0);
+  if (!isDiagonal || targetPiece) return false;
+
+  const fields = String(fen).trim().split(/\s+/);
+  const side = fields[1] || "";
+  const enPassantSquare = fields[3] || "-";
+  if (enPassantSquare !== to) return false;
+  return (side === "w" && movingPiece === "P") || (side === "b" && movingPiece === "p");
+}
+
 export default function App() {
   const [fen, setFen] = useState(START_FEN);
   const [fenDraft, setFenDraft] = useState(START_FEN);
@@ -313,7 +338,7 @@ export default function App() {
     osc.frequency.exponentialRampToValueAtTime(520, now + 0.045);
 
     gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.exponentialRampToValueAtTime(0.075, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.12, now + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
 
     osc.connect(gain);
@@ -321,6 +346,36 @@ export default function App() {
 
     osc.start(now);
     osc.stop(now + 0.065);
+  }, []);
+
+  const playCaptureSound = useCallback(() => {
+    const ctx = audioCtxRef.current;
+    if (!ctx || !audioReadyRef.current || ctx.state !== "running") return;
+
+    const now = ctx.currentTime;
+    const oscA = ctx.createOscillator();
+    const oscB = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    oscA.type = "square";
+    oscB.type = "triangle";
+    oscA.frequency.setValueAtTime(330, now);
+    oscB.frequency.setValueAtTime(240, now);
+    oscA.frequency.exponentialRampToValueAtTime(220, now + 0.08);
+    oscB.frequency.exponentialRampToValueAtTime(170, now + 0.08);
+
+    gain.gain.setValueAtTime(0.0001, now);
+    gain.gain.exponentialRampToValueAtTime(0.16, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.095);
+
+    oscA.connect(gain);
+    oscB.connect(gain);
+    gain.connect(ctx.destination);
+
+    oscA.start(now);
+    oscB.start(now);
+    oscA.stop(now + 0.1);
+    oscB.stop(now + 0.1);
   }, []);
 
   const applyPosition = useCallback((payload) => {
@@ -345,8 +400,12 @@ export default function App() {
     [applyPosition]
   );
 
-  const recordMoveLocally = useCallback((move, actor) => {
-    playMoveSound();
+  const recordMoveLocally = useCallback((move, actor, { isCapture = false } = {}) => {
+    if (isCapture) {
+      playCaptureSound();
+    } else {
+      playMoveSound();
+    }
     setLastMove({ from: move.slice(0, 2), to: move.slice(2, 4) });
     setMoveLog((prev) => [...prev, { by: actor, move }]);
     setTrackedSquare((prev) => {
@@ -354,7 +413,7 @@ export default function App() {
       if (prev === move.slice(0, 2)) return move.slice(2, 4);
       return prev;
     });
-  }, [playMoveSound]);
+  }, [playCaptureSound, playMoveSound]);
 
   const clearSessionUiState = useCallback(() => {
     setThinking(false);
@@ -382,9 +441,10 @@ export default function App() {
 
   const applyMoveToPosition = useCallback(
     async (fromFen, move, actor) => {
+      const isCapture = isCaptureMoveFromFen(fromFen, move);
       const data = await movePosition(fromFen, move);
       applyPosition(data);
-      recordMoveLocally(move, actor);
+      recordMoveLocally(move, actor, { isCapture });
       return data;
     },
     [applyPosition, recordMoveLocally]
@@ -432,8 +492,9 @@ export default function App() {
         appendSearchTimelineFrame(view);
 
         if (autoPlayBestMove && payload.best_move) {
+          const isCapture = isCaptureMoveFromFen(positionFen, payload.best_move);
           applyPosition(payload);
-          recordMoveLocally(payload.best_move, "engine");
+          recordMoveLocally(payload.best_move, "engine", { isCapture });
         }
       } catch (err) {
         if (token !== searchTokenRef.current) return;
