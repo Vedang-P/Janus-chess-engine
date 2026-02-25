@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="380" viewBox="0 0 1200 380">
+  <rect width="1200" height="380" fill="#0c1b26"/>
+  <g font-family="Avenir Next" fill="#f6f1e5">
+    <text x="36" y="48" font-size="28">Search Snapshot Flow</text>
+    <text x="36" y="74" font-size="14" fill="#9ec5d4">Iterative deepening alpha-beta emits throttled snapshots to websocket clients.</text>
+  </g>
+  <g stroke="#f5c07a" fill="#132a38" stroke-opacity="0.55">
+    <rect x="44" y="120" width="180" height="80" rx="10"/>
+    <rect x="280" y="120" width="180" height="80" rx="10"/>
+    <rect x="516" y="120" width="180" height="80" rx="10"/>
+    <rect x="752" y="120" width="180" height="80" rx="10"/>
+    <rect x="988" y="120" width="170" height="80" rx="10"/>
+  </g>
+  <g font-family="Avenir Next" fill="#f6f1e5" font-size="15">
+    <text x="72" y="164">Root Move Loop</text>
+    <text x="308" y="164">Negamax Search</text>
+    <text x="548" y="164">Eval + Breakdown</text>
+    <text x="782" y="164">SnapshotThrottle</text>
+    <text x="1030" y="164">WebSocket UI</text>
+  </g>
+  <g stroke="#7bdaf8" stroke-width="4" fill="none" stroke-linecap="round">
+    <path d="M224 160 H276"/>
+    <path d="M460 160 H512"/>
+    <path d="M696 160 H748"/>
+    <path d="M932 160 H984"/>
+  </g>
+  <g fill="#7bdaf8">
+    <polygon points="276,154 290,160 276,166"/>
+    <polygon points="512,154 526,160 512,166"/>
+    <polygon points="748,154 762,160 748,166"/>
+    <polygon points="984,154 998,160 984,166"/>
+  </g>
+</svg>

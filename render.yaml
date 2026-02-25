@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: chess-engine-api
+    env: docker
+    plan: free
+    autoDeploy: true

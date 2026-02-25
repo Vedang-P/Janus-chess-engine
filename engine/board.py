@@ -345,6 +345,44 @@ class Board:
             self.fullmove_number,
         )
 
+    def to_fen(self) -> str:
+        ranks: list[str] = []
+        for r in range(7, -1, -1):
+            empty = 0
+            parts: list[str] = []
+            for f in range(8):
+                sq = r * 8 + f
+                piece = self.piece_on(sq)
+                if piece == PIECE_NONE:
+                    empty += 1
+                else:
+                    if empty:
+                        parts.append(str(empty))
+                        empty = 0
+                    parts.append(PIECE_SYMBOLS[piece])
+            if empty:
+                parts.append(str(empty))
+            ranks.append("".join(parts))
+
+        castling = ""
+        if self.castling_rights & CASTLE_WHITE_KING:
+            castling += "K"
+        if self.castling_rights & CASTLE_WHITE_QUEEN:
+            castling += "Q"
+        if self.castling_rights & CASTLE_BLACK_KING:
+            castling += "k"
+        if self.castling_rights & CASTLE_BLACK_QUEEN:
+            castling += "q"
+        if not castling:
+            castling = "-"
+
+        ep = "-" if self.en_passant is None else square_name(self.en_passant)
+        side = "w" if self.side_to_move == WHITE else "b"
+        return (
+            f"{'/'.join(ranks)} {side} {castling} {ep} "
+            f"{self.halfmove_clock} {self.fullmove_number}"
+        )
+
     def __str__(self) -> str:
         rows = []
         for r in range(7, -1, -1):

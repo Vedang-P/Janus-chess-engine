@@ -1,36 +1,45 @@
-"""Search instrumentation data structures."""
+"""Search instrumentation models and throttled emission."""
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-
-from .search import SearchResult
+from dataclasses import asdict, dataclass
+from time import perf_counter
+from typing import Callable
 
 
 @dataclass(slots=True)
 class SearchSnapshot:
     depth: int
-    score: int
-    pv: list[str]
     nodes: int
     nps: int
+    current_move: str
+    pv: list[str]
+    eval: float
+    eval_cp: int
+    candidate_moves: dict[str, float]
+    piece_values: dict[str, int]
+    piece_breakdown: dict[str, dict[str, int | str]]
+    heatmap: dict[str, int]
+    cutoffs: int
     elapsed_ms: float
-    candidates: list[dict[str, int]]
+
+    def to_dict(self) -> dict:
+        return asdict(self)
 
 
-@dataclass(slots=True)
-class SearchRecorder:
-    snapshots: list[SearchSnapshot] = field(default_factory=list)
+class SnapshotThrottle:
+    """Emit snapshots at a bounded rate to avoid overloading websocket clients."""
 
-    def on_iteration(self, result: SearchResult) -> None:
-        self.snapshots.append(
-            SearchSnapshot(
-                depth=result.depth,
-                score=result.score,
-                pv=[m.uci() for m in result.pv],
-                nodes=result.nodes,
-                nps=result.nps,
-                elapsed_ms=result.elapsed_ms,
-                candidates=[{"move": c.move, "score": c.score} for c in result.candidates[:10]],
-            )
-        )
+    def __init__(self, interval_ms: int, callback: Callable[[SearchSnapshot], None] | None) -> None:
+        self.interval = max(1, interval_ms) / 1000.0
+        self.callback = callback
+        self._next_emit_at = 0.0
+
+    def emit(self, snapshot: SearchSnapshot, force: bool = False) -> None:
+        if self.callback is None:
+            return
+
+        now = perf_counter()
+        if force or now >= self._next_emit_at:
+            self.callback(snapshot)
+            self._next_emit_at = now + self.interval

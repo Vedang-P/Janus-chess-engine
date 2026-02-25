@@ -86,6 +86,12 @@ def test_make_unmake_castle_roundtrip() -> None:
     assert snapshot(board) == initial
 
 
+def test_to_fen_round_trip() -> None:
+    fen = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"
+    board = Board(fen)
+    assert board.to_fen() == fen
+
+
 def test_reject_move_for_wrong_side_to_move() -> None:
     board = Board("8/8/8/8/8/8/4P3/4K3 b - - 0 1")
     initial = snapshot(board)

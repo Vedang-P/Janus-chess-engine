@@ -8,34 +8,34 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from engine.board import Board
 from engine.constants import START_FEN
+from engine.instrumentation import SearchSnapshot
 from engine.search import SearchEngine, SearchResult
 
 router = APIRouter()
 
 
-def _serialize_iteration(result: SearchResult) -> dict:
-    return {
-        "type": "iteration",
-        "depth": result.depth,
-        "score": result.score,
-        "nodes": result.nodes,
-        "nps": result.nps,
-        "elapsed_ms": round(result.elapsed_ms, 2),
-        "pv": [move.uci() for move in result.pv],
-        "candidates": [{"move": c.move, "score": c.score} for c in result.candidates[:10]],
-        "best_move": result.best_move.uci() if result.best_move else None,
-    }
+def _serialize_snapshot(snapshot: SearchSnapshot) -> dict:
+    payload = snapshot.to_dict()
+    payload["type"] = "snapshot"
+    return payload
 
 
 def _serialize_complete(result: SearchResult) -> dict:
     return {
         "type": "complete",
         "depth": result.depth,
-        "score": result.score,
         "nodes": result.nodes,
         "nps": result.nps,
-        "elapsed_ms": round(result.elapsed_ms, 2),
+        "current_move": result.current_move,
         "pv": [move.uci() for move in result.pv],
+        "eval": result.eval,
+        "eval_cp": result.score,
+        "candidate_moves": result.candidate_moves,
+        "piece_values": result.piece_values,
+        "piece_breakdown": result.piece_breakdown,
+        "heatmap": result.heatmap,
+        "cutoffs": result.cutoffs,
+        "elapsed_ms": round(result.elapsed_ms, 2),
         "best_move": result.best_move.uci() if result.best_move else None,
     }
 
@@ -50,14 +50,15 @@ async def search_websocket(websocket: WebSocket) -> None:
             fen = payload.get("fen", START_FEN)
             max_depth = int(payload.get("max_depth", 5))
             time_limit_ms = int(payload.get("time_limit_ms", 3000))
+            snapshot_interval_ms = int(payload.get("snapshot_interval_ms", 75))
 
             board = Board(fen)
             engine = SearchEngine()
             event_queue: asyncio.Queue[dict | None] = asyncio.Queue()
             loop = asyncio.get_running_loop()
 
-            def on_iteration(result: SearchResult) -> None:
-                loop.call_soon_threadsafe(event_queue.put_nowait, _serialize_iteration(result))
+            def on_snapshot(snapshot: SearchSnapshot) -> None:
+                loop.call_soon_threadsafe(event_queue.put_nowait, _serialize_snapshot(snapshot))
 
             async def run_search() -> None:
                 try:
@@ -66,7 +67,9 @@ async def search_websocket(websocket: WebSocket) -> None:
                         board,
                         max_depth,
                         time_limit_ms,
-                        on_iteration,
+                        None,
+                        on_snapshot,
+                        snapshot_interval_ms,
                     )
                     await event_queue.put(_serialize_complete(result))
                 except Exception as exc:  # noqa: BLE001
