@@ -53,6 +53,7 @@ const EMPTY_SEARCH = {
   eval: null,
   eval_cp: null,
   search_side: "w",
+  root_fullmove: 1,
   nodes: 0,
   nps: 0,
   cutoffs: 0,
@@ -75,15 +76,27 @@ function clampEvalFill(scoreCp) {
   return 50 + clamped / 24;
 }
 
-function formatPvLine(pv) {
+function formatPvLine(pv, rootSide = "w", rootFullmove = 1) {
   if (!pv || pv.length === 0) return "-";
 
   const tokens = [];
-  for (let idx = 0; idx < pv.length; idx += 1) {
-    if (idx % 2 === 0) {
-      tokens.push(`${Math.floor(idx / 2) + 1}.`);
+  let moveNo = Number.isFinite(rootFullmove) && rootFullmove > 0 ? Math.trunc(rootFullmove) : 1;
+  let side = rootSide === "b" ? "b" : "w";
+
+  for (const move of pv) {
+    if (side === "w") {
+      tokens.push(`${moveNo}.`);
+      tokens.push(move);
+      side = "b";
+      continue;
     }
-    tokens.push(pv[idx]);
+
+    if (tokens.length === 0) {
+      tokens.push(`${moveNo}...`);
+    }
+    tokens.push(move);
+    moveNo += 1;
+    side = "w";
   }
   return tokens.join(" ");
 }
@@ -117,6 +130,14 @@ function normalizeFenInput(rawFen) {
   if (!normalized) return "";
   if (normalized.toLowerCase() === "startpos") return START_FEN;
   return normalized;
+}
+
+function fenFullmoveNumber(fen) {
+  const fields = String(fen || "").trim().split(/\s+/);
+  if (fields.length < 6) return 1;
+  const parsed = Number.parseInt(fields[5], 10);
+  if (Number.isNaN(parsed) || parsed < 1) return 1;
+  return parsed;
 }
 
 export default function App() {
@@ -322,7 +343,7 @@ export default function App() {
     [applyPosition, recordMoveLocally]
   );
 
-  const buildSearchView = useCallback((payload, whiteSign, rootSide) => {
+  const buildSearchView = useCallback((payload, whiteSign, rootSide, rootFullmove) => {
     const evalCpWhite = (payload.eval_cp ?? 0) * whiteSign;
     const evalWhite = normalizeScore((payload.eval ?? 0) * whiteSign);
     const candidateMovesWhite = Object.fromEntries(
@@ -337,6 +358,7 @@ export default function App() {
       eval: evalWhite,
       eval_cp: evalCpWhite,
       search_side: rootSide,
+      root_fullmove: rootFullmove,
       nodes: payload.nodes || 0,
       nps: payload.nps || 0,
       cutoffs: payload.cutoffs || 0,
@@ -351,14 +373,14 @@ export default function App() {
   }, []);
 
   const runHttpFallbackSearch = useCallback(
-    async (positionFen, whiteSign, rootSide, autoPlayBestMove, token) => {
+    async (positionFen, whiteSign, rootSide, rootFullmove, autoPlayBestMove, token) => {
       try {
         const payload = autoPlayBestMove
           ? await engineMovePosition(positionFen, maxDepth, timeMs)
           : await analyzePosition(positionFen, maxDepth, timeMs);
         if (token !== searchTokenRef.current) return;
 
-        const view = buildSearchView(payload, whiteSign, rootSide);
+        const view = buildSearchView(payload, whiteSign, rootSide, rootFullmove);
         setSearch(view);
         appendSearchTimelineFrame(view);
 
@@ -391,6 +413,7 @@ export default function App() {
     (positionFen, { autoPlayBestMove }) => {
       const token = ++searchTokenRef.current;
       const rootSide = positionFen.split(" ")[1] === "b" ? "b" : "w";
+      const rootFullmove = fenFullmoveNumber(positionFen);
       const whiteSign = rootSide === "w" ? 1 : -1;
       const watchdogMs = Math.max(4000, timeMs + 3500);
       setThinking(true);
@@ -418,7 +441,7 @@ export default function App() {
         completed = true;
         clearWatchdog();
           closeSocket();
-          runHttpFallbackSearch(positionFen, whiteSign, rootSide, autoPlayBestMove, token);
+          runHttpFallbackSearch(positionFen, whiteSign, rootSide, rootFullmove, autoPlayBestMove, token);
         };
 
       const armWatchdog = () => {
@@ -454,7 +477,7 @@ export default function App() {
             return;
           }
           lastSnapshotUiUpdateRef.current = now;
-          const view = buildSearchView(data, whiteSign, rootSide);
+          const view = buildSearchView(data, whiteSign, rootSide, rootFullmove);
           setSearch(view);
           appendSearchTimelineFrame(view);
           return;
@@ -463,7 +486,7 @@ export default function App() {
         if (data.type === "complete") {
           completed = true;
           clearWatchdog();
-          const view = buildSearchView(data, whiteSign, rootSide);
+          const view = buildSearchView(data, whiteSign, rootSide, rootFullmove);
           setSearch(view);
           appendSearchTimelineFrame(view);
 
@@ -848,7 +871,7 @@ export default function App() {
 
             <div className="info-section">
               <h2>Principal Variation</h2>
-              <p className="pv-line">{formatPvLine(search.pv)}</p>
+              <p className="pv-line">{formatPvLine(search.pv, search.search_side, search.root_fullmove)}</p>
             </div>
 
             <div className="split-columns">
