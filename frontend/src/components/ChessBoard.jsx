@@ -183,8 +183,17 @@ export default function ChessBoard({
           <stop offset="0%" stopColor="#b58863" />
           <stop offset="100%" stopColor="#b58863" />
         </linearGradient>
-        <marker id="arrowHead" markerWidth="7" markerHeight="7" refX="6" refY="2.5" orient="auto">
-          <polygon points="0 0, 6 2.5, 0 5" fill="#7fa650" />
+        <marker
+          id="arrowHead"
+          viewBox="0 0 12 12"
+          markerWidth="9"
+          markerHeight="9"
+          refX="9.5"
+          refY="6"
+          markerUnits="userSpaceOnUse"
+          orient="auto"
+        >
+          <path d="M1 1 L11 6 L1 11 Z" fill="#7fa650" />
         </marker>
       </defs>
 
